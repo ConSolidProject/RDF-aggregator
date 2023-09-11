@@ -2,6 +2,10 @@ import NodeCache from "node-cache"
 import { checkDatasetExistence, queryFuseki } from "./functions"
 import { QueryEngine } from "@comunica/query-sparql"
 import jws from "jws"
+
+const SparqlParser = require('sparqljs').Parser;
+const sparqlParser = new SparqlParser();
+
 const express = require('express')
 const cors = require('cors')
 const bodyParser = require('body-parser')
@@ -55,8 +59,16 @@ async function verify(token) {
 
 async function queryController(req, res) { 
   const {query, tokens} = req.body
+
   if (!query) {
     res.status(400).send("Query parameter is missing")
+    return
+  }
+
+  try {
+    sparqlParser.parse(query);
+  } catch (error) {
+    res.status(400).send(error)
     return
   }
 
@@ -81,6 +93,9 @@ async function queryController(req, res) {
 
 
 async function doQuery(query, sources) {
+
+
+
   const result = await queryEngine.query(query, { sources })
   const { data } = await queryEngine.resultToString(result,'application/sparql-results+json')
   const results = await streamToString(data)
@@ -100,20 +115,47 @@ async function streamToString(stream) {
 
 
 app.listen(port, async () => {
-  const datasetId = process.env.PROJECT_DATASET!
+  const { authFetch, bearer } = await generateFetch(process.env.EMAIL, process.env.PASSWORD, process.env.IDP)
 
+  await checkIfRegistered(authFetch)
   // get project endpoints
   const endpoints = await getConSolidProjectByIdLTBQ()
-
+  console.log('endpoints :>> ', endpoints);
   // get all RDF resources in all endpoints
-  const allResources = await getAllResources(endpoints)
-
+  const allResources = await getAllResourcesAsync(endpoints, authFetch)
+  console.log('allResources :>> ', allResources);
   myCache.set("sources", Array.from(allResources))
   console.log(`Server listening at http://localhost:${port}`);
 })
 
-async function getAllResourcesAsync(endpoints) {
-  const { authFetch, bearer } = await generateFetch(process.env.EMAIL, process.env.PASSWORD, process.env.IDP)
+async function checkIfRegistered(fetch) {
+  const query = `
+  prefix dcat: <http://www.w3.org/ns/dcat#>
+  prefix dcterms: <http://purl.org/dc/terms/>
+  ASK {
+    <${process.env.CATALOGUE}> dcat:service <${process.env.URL}> .
+    <${process.env.URL}> dcterms:conformsTo <https://www.w3.org/TR/sparql11-protocol/> ;
+      dcat:endpointURL <${process.env.URL}> .
+    
+  }` 
+
+  const myEngine = new QueryEngine()
+  const result = await myEngine.queryBoolean(query, { sources: [process.env.CATALOGUE!], fetch })
+  if (!result) {
+    const registerQuery = `
+    prefix dcat: <http://www.w3.org/ns/dcat#>
+    prefix dcterms: <http://purl.org/dc/terms/>
+    INSERT DATA {
+      <${process.env.CATALOGUE}> dcat:service <${process.env.URL}> .
+      <${process.env.URL}> dcterms:conformsTo <https://www.w3.org/TR/sparql11-protocol/> ;
+        dcat:endpointURL <${process.env.URL}/sparql> .
+    }`   
+
+    await fetch(process.env.CATALOGUE!, { method: "PATCH", headers: { "Content-Type": "application/sparql-update" }, body: registerQuery }).catch(() => new Error("Could not register endpoint"))
+  }
+}
+
+async function getAllResourcesAsync(endpoints, authFetch) {
 
   const allResources = new Set()
   for (const e of endpoints) {
@@ -142,7 +184,7 @@ async function getAllResourcesAsync(endpoints) {
   return allResources
 }
 
-async function getAllResources(endpoints) {
+async function getAllResources(endpoints, authFetch) {
   return ['http://localhost:3000/owner-duplex/614ce4e7-ddd1-4de7-a13e-ad16880ba013',
     'http://localhost:3000/architect-duplex/8ae668de-561f-4747-9470-b28de122e7e3',
     'http://localhost:3000/architect-duplex/a25e5164-a1ff-46d1-905c-b169a4517f2f',
