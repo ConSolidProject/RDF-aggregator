@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "es6",
+    "noImplicitAny": false,
+    "module": "commonjs",
+    "lib": ["es6"],
+    "outDir": "./dist",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "paths": {
+      "*": ["./@custom_types/*"]
+    },
+  },
+  "include": ["src"]
+}
