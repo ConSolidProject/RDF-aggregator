@@ -23,6 +23,7 @@
     "express": "^4.18.2",
     "express-solid-auth-wrapper": "github:ConSolidProject/express-solid-auth-wrapper",
     "node-cache": "^5.1.2",
+    "sparqlalgebrajs": "^4.3.0",
     "sparqljs": "^3.7.1"
   }
 }
