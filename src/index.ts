@@ -175,7 +175,7 @@ app.listen(port, async () => {
   // get project endpoints
   const endpoints = await getConSolidProjectByIdLTBQ()
   // get all RDF resources in all endpoints
-  const allResources = await getAllResources(endpoints, authFetch)
+  const allResources = await getAllResourcesAsync(endpoints, authFetch)
   myCache.set("sources", Array.from(allResources))
 
   console.log(`Server listening at http://localhost:${port}`);
